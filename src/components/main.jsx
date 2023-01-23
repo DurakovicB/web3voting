@@ -6,7 +6,6 @@ const VotingApp = () => {
   const [web3, setWeb3] = useState(null);
   const [contract, setContract] = useState(null);
   const [candidateNames, setCandidateNames] = useState([]);
-  const [candidateCode, setCandidateCode] = useState({});
   const [account, setAccount] = useState(null);
   const [currentWinner, setCurrentWinner] = useState('');
   const [votes, setVotes] = useState({});
@@ -28,68 +27,62 @@ const VotingApp = () => {
         // Get the current account
         web3.eth.getAccounts()
           .then(accounts => {
-            setAccount(accounts[0]);
-          });
-        
-        // Get the list of candidate names
-        contract.methods.getCandidates().call()
-          .then(result => {
-            setCandidateNames(result);
-            result.forEach((name, index) => {
-              setCandidateCode(prevState => ({ ...prevState, [name]: index }));
+            setAccount(
+                accounts[0]);
             });
-          })
-          .catch(error => {
-            console.log(error);
-          });
-
-        // Get the number of votes for each candidate
-        if(candidateNames.length>0){
-          candidateNames.forEach(async (name) => {
-            const voteCount = await contract.methods.numberOfVotesFor(candidateCode[name]).call();
-            setVotes(prevState => ({ ...prevState, [name]: voteCount }));
-          });
         }
       }
+    }, [web3]);
+    
+    useEffect(() => {
+      if (contract) {
+        // Get the list of candidates
+        contract.methods.getCandidates().call()
+          .then(candidates => {
+            setCandidateNames(candidates);
+          });
+      }
+    }, [contract]);
+  
+    const handleVote = async (candidate) => {
+      try {
+        // Send a vote transaction
+        await contract.methods.voteForCandidate(candidate).send({ from: account });
+        
+        // Get the number of votes for the candidate
+        const voteCount = await contract.methods.numberOfVotesFor(candidate).call();
+        
+        setVotes(prevState => ({ ...prevState, [candidate]: voteCount }));
+      } catch (error) {
+        console.log(error);
+      }
     }
-  }, [candidateNames]);
-
-  const handleVote = async (candidate) => {
-    try {
-      // Send a vote transaction
-      await contract.methods.voteForCandidate(candidateCode[candidate]).send({ from: account });
-      // Update the number of votes
-      const voteCount = await contract.methods.numberOfVotesFor(candidateCode[candidate]).call();
-      setVotes(prevState => ({ ...prevState, [candidate]: voteCount }));
-    } catch (error) {
-      console.log(error);
+  
+    const handleWinner = async () => {
+      try {
+        // Get the current winner
+        const winner = await contract.methods.currentWinner().call();
+        setCurrentWinner(winner);
+      } catch (error) {
+        console.log(error);
+      }
     }
+  
+    return (
+      <div>
+        <h1>Voting App</h1>
+        {candidateNames.length>0 && candidateNames.map((name, index) => (
+          <div key={index}>
+            <p>{name}</p>
+            <button onClick={() => handleVote(name)}>Vote</button>
+            <p>Votes: {votes[name]}</p>
+          </div>
+        ))}
+        <button onClick={handleWinner}>View Winner</button>
+        {currentWinner && <p>Current Winner: {currentWinner}</p>}
+      </div>
+    );
   }
-
-  const handleWinner = async () => {
-    try {
-      // Get the current winner
-      const winner = await contract.methods.currentWinner().call();
-      setCurrentWinner(winner);
-    } catch (error) {
-      console.log(error);
-    }
-  }
-
-  return (
-    <div>
-      <h1>Voting App</h1>
-      {candidateNames.length>0 && candidateNames.map((name, index) => (
-        <div key={index}>
-          <p>{name}</p>
-          <button onClick={() => handleVote(name)}>Vote</button>
-          <p>Votes: {votes[name]}</p>
-        </div>
-      ))}
-      <button onClick={handleWinner}>View Winner</button>
-      {currentWinner && <p>Current Winner: {currentWinner}</p>}
-    </div>
-  );
-}
-
-export default VotingApp;
+  
+  export default VotingApp;
+  
