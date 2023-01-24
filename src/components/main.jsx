@@ -35,28 +35,55 @@ const VotingApp = () => {
     }, [web3]);
     
     useEffect(() => {
-      if (contract) {
-        // Get the list of candidates
-        contract.methods.getCandidates().call()
-          .then(candidates => {
-            setCandidateNames(candidates);
-          });
-      }
-    }, [contract]);
+        if (contract) {
+            // Get the list of candidates
+            contract.methods.getCandidates().call()
+              .then(candidates => {
+                setCandidateNames(candidates);
+              });
+        }
+      }, [contract]);
+    
+      useEffect(() => {
+        if (contract && candidateNames.length > 0) {
+          // Get the votes for each candidate
+          const initialVotes = {};
+          for(let i = 0; i < candidateNames.length; i++) {
+            contract.methods.candidateCode(candidateNames[i]).call()
+              .then(candidateCode => {
+                contract.methods.numberOfVotesFor(candidateCode).call()
+                  .then(voteCount => {
+                    initialVotes[candidateNames[i]] = voteCount;
+                    setVotes(initialVotes);
+                  });
+              });
+          }
+        }
+      }, [contract, candidateNames]);
   
-    const handleVote = async (candidate) => {
-      try {
+      const handleVote = async (candidate) => {
+        try {
+        if (typeof window.ethereum !== 'undefined') {
+        await window.ethereum.enable();
+        if (web3) {
+        // Get the candidate code for the candidate name
+        const candidateCode = await contract.methods.candidateCode(candidate).call();
         // Send a vote transaction
-        await contract.methods.voteForCandidate(candidate).send({ from: account });
+        await contract.methods.voteForCandidate(candidateCode).send({ from: account });
         
-        // Get the number of votes for the candidate
-        const voteCount = await contract.methods.numberOfVotesFor(candidate).call();
-        
-        setVotes(prevState => ({ ...prevState, [candidate]: voteCount }));
-      } catch (error) {
-        console.log(error);
-      }
-    }
+                  // Get the number of votes for the candidate
+                  const voteCount = await contract.methods.numberOfVotesFor(candidateCode).call();
+          
+                  // Update the votes state variable with the number of votes for the candidate
+                  setVotes(prevState => ({ ...prevState, [candidate]: voteCount }));
+                }
+              }
+            } catch (error) {
+              console.log(error);
+            }
+          };
+      
+    
   
     const handleWinner = async () => {
       try {
@@ -75,7 +102,8 @@ const VotingApp = () => {
           <div key={index}>
             <p>{name}</p>
             <button onClick={() => handleVote(name)}>Vote</button>
-            <p>Votes: {votes[name]}</p>
+            <p>Votes: {votes[name] ? votes[name] : 0}</p>
+
           </div>
         ))}
         <button onClick={handleWinner}>View Winner</button>
