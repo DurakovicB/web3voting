@@ -1,116 +1,52 @@
-import React, { useState, useEffect } from 'react';
-import Web3 from 'web3';
-import ABI from './ABI.json';
+import React, { useState, useEffect } from "react";
+import Web3 from "web3";
+import ABI from "./ABI.json";
 
-const VotingApp = () => {
-  const [web3, setWeb3] = useState(null);
-  const [contract, setContract] = useState(null);
-  const [candidateNames, setCandidateNames] = useState([]);
-  const [account, setAccount] = useState(null);
-  const [currentWinner, setCurrentWinner] = useState('');
-  const [votes, setVotes] = useState({});
+const contractAddress = "0xfB13B567954686F66CBAe11817C07B4f84a116cc";
+const web3 = new Web3(window.ethereum);
+
+const contract = new web3.eth.Contract(ABI, contractAddress);
+
+async function getCandidates() {
+  const candidates = await contract.methods.getCandidates().call();
+  return candidates;
+}
+
+async function getVotes(index) {
+  const votes = await contract.methods.getVotes(index).call();
+  return votes;
+}
+
+const Main = () => {
+  const [candidates, setCandidates] = useState([]);
+  const [votes, setVotes] = useState([]);
 
   useEffect(() => {
-    // Check for web3 and metamask
-    if (window.ethereum) {
-      // Initialize web3
-      const web3js = new Web3(window.ethereum);
-      window.ethereum.enable();
-      setWeb3(web3js);
+    const fetchData = async () => {
+      const candidates = await getCandidates();
+      setCandidates(candidates);
 
-      // Set the contract address and ABI
-      const contractAddress = '0x1Efb376f4fF367a45879D5630b74f38Abf9Ac5E8';
-      const contract = new web3js.eth.Contract(ABI, contractAddress);
-      setContract(contract);
-      
-      if(web3){
-        // Get the current account
-        web3.eth.getAccounts()
-          .then(accounts => {
-            setAccount(
-                accounts[0]);
-            });
-        }
+      const votes = [];
+      for (let i = 0; i < candidates.length; i++) {
+        const candidateVotes = await getVotes(i);
+        votes.push(candidateVotes);
       }
-    }, [web3]);
-    
-    useEffect(() => {
-        if (contract) {
-            // Get the list of candidates
-            contract.methods.getCandidates().call()
-              .then(candidates => {
-                setCandidateNames(candidates);
-              });
-        }
-      }, [contract]);
-    
-      useEffect(() => {
-        if (contract && candidateNames.length > 0) {
-          // Get the votes for each candidate
-          const initialVotes = {};
-          for(let i = 0; i < candidateNames.length; i++) {
-            contract.methods.candidateCode(candidateNames[i]).call()
-              .then(candidateCode => {
-                contract.methods.numberOfVotesFor(candidateCode).call()
-                  .then(voteCount => {
-                    initialVotes[candidateNames[i]] = voteCount;
-                    setVotes(initialVotes);
-                  });
-              });
-          }
-        }
-      }, [contract, candidateNames]);
-  
-      const handleVote = async (candidate) => {
-        try {
-        if (typeof window.ethereum !== 'undefined') {
-        await window.ethereum.enable();
-        if (web3) {
-        // Get the candidate code for the candidate name
-        const candidateCode = await contract.methods.candidateCode(candidate).call();
-        // Send a vote transaction
-        await contract.methods.voteForCandidate(candidateCode).send({ from: account });
-        
-                  // Get the number of votes for the candidate
-                  const voteCount = await contract.methods.numberOfVotesFor(candidateCode).call();
-          
-                  // Update the votes state variable with the number of votes for the candidate
-                  setVotes(prevState => ({ ...prevState, [candidate]: voteCount }));
-                }
-              }
-            } catch (error) {
-              console.log(error);
-            }
-          };
-      
-    
-  
-    const handleWinner = async () => {
-      try {
-        // Get the current winner
-        const winner = await contract.methods.currentWinner().call();
-        setCurrentWinner(winner);
-      } catch (error) {
-        console.log(error);
-      }
-    }
-  
-    return (
-      <div>
-        <h1>Voting App</h1>
-        {candidateNames.length>0 && candidateNames.map((name, index) => (
-          <div key={index}>
-            <p>{name}</p>
-            <button onClick={() => handleVote(name)}>Vote</button>
-            <p>Votes: {votes[name] ? votes[name] : 0}</p>
+      setVotes(votes);
+    };
+    fetchData();
+  }, []);
 
-          </div>
-        ))}
-        <button onClick={handleWinner}>View Winner</button>
-        {currentWinner && <p>Current Winner: {currentWinner}</p>}
-      </div>
-    );
-  }
-  
-  export default VotingApp;
-  
+  return (
+    <div>
+      <h1>Main component</h1>
+      {candidates.map((candidate, index) => (
+        <div key={candidate}>
+          <p>Candidate: {candidate}</p>
+          <p>Votes: {votes[index]}</p>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default Main;
