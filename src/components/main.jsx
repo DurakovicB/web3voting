@@ -17,6 +17,12 @@ async function getVotes(index) {
   return votes;
 }
 
+async function vote(index) {
+  const accounts = await web3.eth.getAccounts();
+  const result = await contract.methods.vote(index).send({ from: accounts[0] });
+  console.log(result);
+}
+
 const Main = () => {
   const [candidates, setCandidates] = useState([]);
   const [votes, setVotes] = useState([]);
@@ -43,6 +49,7 @@ const Main = () => {
         <div key={candidate}>
           <p>Candidate: {candidate}</p>
           <p>Votes: {votes[index]}</p>
+          <button onClick={() => vote(index)}>Vote</button>
         </div>
       ))}
     </div>
